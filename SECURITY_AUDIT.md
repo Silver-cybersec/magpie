@@ -9,7 +9,7 @@
 - 被审 commit：`7c37424fcf3922f4daed4bb2af625065bf506e9e`
 - 本 fork：`Silver-cybersec/magpie`，默认分支 `main`，HEAD 即上述 SHA。提交说明：`gui: the Linux app draws without backdrop blur…`（yetone，2026-11-12）。
 - 上游 `yetone/magpie` tag `v0.1.3931` 指向同一 SHA。该 Release（发布在 `yetone/magpie-releases`）含 17 个资产，其中包括 `SHA256SUMS` 与 `SHA256SUMS.sig`。
-- 审计当时上游默认分支 `main` 为 `d6b5f24db5d077ab0a611404f6ed88775647e6e4`（`routing: Codex seats of one name are not folded into one account card`）。GitHub compare：`7c37424…main` 为 `ahead`（ahead 1、behind 0）。本 fork 没有相对上游的独有提交，只是比 `main` 少这 1 个提交。该提交不在本次阅读范围内。
+- 第一次阅读时，上游默认分支 `main` 为 `d6b5f24db5d077ab0a611404f6ed88775647e6e4`。补审时再次 `git fetch` 公开上游（2026-11-12 UTC）：`main` 为 `797a23cade5aa013a85b52cadc317fcc7f0c1c11`，比 `7c37424f` 多 **11** 个提交，其中包含 `d6b5f24d`。本 fork 仍然没有独有提交。这 11 个提交的 diff 已逐文件看过，结论在第 7 节。
 - 许可证文件：根目录 `LICENSE` 为 MIT，Copyright (c) 2026 yetone。上游仓库元数据 SPDX 为 MIT。
 
 ## 1. 结论摘要
@@ -189,7 +189,7 @@ magpie 自己的服务与下载（会主动连接）：
 | `golang.org/x/image` v0.43.0 | GO-2026-6222 | VP8L（无损 WebP）解码内存 | **已核实**命中版本。本仓库 import 了 `x/image/webp` 与 `draw`。是否解码不受信任的 VP8L **无法确认** |
 | `google.golang.org/grpc` v1.76.0 | GHSA-p77j-4mvh-x3m3（机密性与完整性高，授权绕过）；另有数条 xDS / HTTP/2 DoS | gRPC 服务端问题 | **已核实**命中版本。本仓库 `*.go` 未直接 import。属间接依赖。magpie 不对外提供 gRPC 服务。可达性 **无法确认** |
 | 其余直接依赖（bubbletea、wails v3.0.0-beta.24、sqlite、uuid、fsnotify、websocket、jsonschema v6.0.3、gjson 等） | 本次 query 无 vuln | — | **已核实**无返回 |
-| `@magpie-community/opencode-qoder-auth` 0.2.67 | OSV query 无 vuln | npm 元数据 MIT、无 scripts | **已核实**（元数据与 OSV）。包内源码未审 |
+| `@magpie-community/opencode-qoder-auth` 0.2.67 | OSV query 无 vuln | npm 元数据 MIT、无 scripts | **已核实**。源码补审见第 8 节 |
 
 未把上述条目标成「冲突」：OSV 的版本匹配与「本进程会执行到有缺陷的函数」不是同一件事。没有一条被标成恶意包投毒。
 
@@ -210,11 +210,96 @@ magpie 自己的服务与下载（会主动连接）：
 ## 6. 未覆盖与无法确认
 
 - 未运行、未单步、未对发布二进制做符号或哈希对比，因此不能证明 `v0.1.3931` 的资产就是这个 commit 的比特级产物。只能确认公开工作流声明它检出该 ref 并执行 Makefile。
-- 上游 `main` 上多出的 `d6b5f24` 未读。
-- `magpie-community/plugins` 各包源码、Bun 二进制本体、`pf-serve` 二进制本体未审。只审了本仓库如何下载、如何校验、以及 Qoder 包的 registry 元数据。
+- 上游 `main` 比 `7c37424f` 多出的 11 个提交已在第 7 节阅读。再往后的新提交不在这次 fetch 里。
+- 社区插件：自动安装的 12 个订阅插件已按源码补审（第 8 节）。官方索引其余条目只做了模式扫描或 npm 元数据，未逐行阅读。Bun 二进制与 `pf-serve` 二进制本体仍未审。
 - 线上 Worker 与 R2 是否等于本 commit 的 `site/`：只核对了 `install.sh` 一致。Worker 部署可以在不改这个文件的情况下改变 `/api/latest`。
 - `magpie-releases` 的 `scripts/notes.sh`、公证失败后的分支、Homebrew tap 的其余文件未逐行读完。
 - OSV 命中项未做到「补丁是否覆盖 magpie 的调用点」。
 - 各供应商当前服务条款原文未逐份核对。
 - Windows ACL、macOS 钥匙串 ACL、以及发行版上 WebKit 的实际 DNS 行为未在本环境验证。
-- 没有一套完整的「恶意包」名录被整份对照；结论限于 OSV 查询、模块路径和公开仓库元数据。
+- 没有一套完整的「恶意包」名录被整份对照；结论限于 OSV 查询、模块路径和公开仓库元数据。插件依赖的补充见第 9 节。
+
+## 7. 补审：上游 main 比 v0.1.3931 多出的提交
+
+结论：这 11 个提交不改变凭据仍是明文 `0600`、网关默认仍听回环、更新与安装流程、以及 `go.mod`/`go.sum` 这些先前结论。新增的是界面、用量分组、目录标价，以及一项由用户打开的 Codex 客户端身份选项。风险定级不因此上升。
+
+获取方式：`git fetch` `https://github.com/yetone/magpie.git` 的 `main`（只读）。范围 `7c37424fcf3922f4daed4bb2af625065bf506e9e..797a23cade5aa013a85b52cadc317fcc7f0c1c11`，48 个文件，`+1909/−84`。其中三个文档页（`site/public/docs/*/web-search.html` 与 `llms-full.txt`）占了大部分行数，是网站说明，不是运行时代码。`go.mod`、`go.sum`、`Dockerfile`、`install.sh`、`internal/update`、`internal/gateway/lan.go`、`internal/gateway/cors.go` 无 diff。
+
+| 提交 | 说明 | 与先前结论的关系 |
+| --- | --- | --- |
+| `d6b5f24db` | Routing：同一邮箱的 Codex 席位按 plan 分开计 | 只改用量分组键 `tallyKey`（`internal/gateway/history.go`）。不改鉴权或外发 |
+| `76ceff87c` | Usage：读者自选的小时数 | 用量页展示。`8097860ab` 把这次误删的 `main` 内容放回 |
+| `1ca2c62c4` | 目录：中转的 `deepseek-v4.1-flash` 按 DeepSeek 标价 | `internal/catalog/catalog.go` 标价。不改 `models.dev` 的地址 |
+| `8097860ab` | 放回 `76ceff87c` 误删的内容 | 见上 |
+| `1488762da` | 设置里 MCP 地址增加「这台电脑 / 局域网」开关 | 只改设置页展示哪一个已有地址（`localStorage` `magpie.mcpWhere`）。不新开监听、不放宽网关 Key。远端仍要网关 Key，文案里写了 |
+| `227171f69` | 测试夹具按 plan 分组 | 测试 |
+| `0f0f391e6` | 网站：网页搜索说明（英/中/日） | 文档 |
+| `b4821050a` | `LESSONS.md` | 文档 |
+| `35aaaa4b9` | 设置：对 ChatGPT 自称 Codex CLI 或 Codex Desktop | 见下。默认仍是 CLI |
+| `2fa79aef3` | 保存时若字节已经相同则不重写（#6289） | 见下。模式仍是 `0600`，内容仍明文 |
+| `797a23cade5aa013a85b52cadc317fcc7f0c1c11` | 托盘文案只留一种语言 | 界面。补审时的上游 `main` 尖端 |
+
+`35aaaa4b9`（`internal/provider/codex_request.go`、`codex_tier.go`、`internal/settings/settings.go`、`POST /api/settings/codex-client`）：用户可以把订阅请求的 `originator` / `User-Agent` 从默认的 `codex_cli_rs` 改成 Codex Desktop 那一套（版本串写死为 `26.1026.10807`）。请求仍发往原来的 ChatGPT/Codex 主机，不新增域名，不把 Key 写到别处。这是客户端身份选项，和先前「用订阅令牌走非官方路径、可能触及服务条款」同级，不是后门。`v0.1.3931` 的二进制还没有这个开关。
+
+`2fa79aef3`：`writePrivate` / `writeLogins` / `writeChanged` 在文件已是同样字节时跳过替换。Unix 上权限与目标 `0600`（或调用方传入的模式）不符仍会重写。Windows 上 `fileHolds` 不比较权限，因此内容相同但 ACL 更松的文件不会被这次写入收紧，要等内容变化。凭据仍不加密。`codex-autoreset` 的记录本来就是 `0644`，这次只是换成同一条件的写入。
+
+## 8. 补审：社区插件
+
+结论：magpie 会自动安装的 12 个订阅插件，源码在公开单仓 `magpie-community/plugins`，审读 commit `16b487fa8ee2ce984b38629807664448f65250b0`（2026-11-13 00:56 +0800，`agy-cli 0.1.29: release the Gemini 4 Carbon limits`）。它们把订阅令牌发给各供应商自己的 API，没有看到发往 PostHog 或 `usemagpie.ai` 的隐藏上报。官方索引另有 107 个条目，这次没有逐行读完。
+
+索引来源（本仓库已引用，补审时与上述 commit 的 `registry.json` 字节相同，119 条，`version` 1）：
+
+- 自动安装：`internal/provider/migrate_*.go` 的 `movers`。有对应账号时 magpie 安装这些 npm 包。
+- 发现/推荐：`https://raw.githubusercontent.com/magpie-community/plugins/main/registry.json`（`internal/plugin/market.go` 的 `MarketURL`）。Discover 列表另有 `tagged.json`（`internal/plugin/catalog.go`），由同一仓库的 dist 分支生成。
+
+仓库：<https://github.com/magpie-community/plugins>。下面「目录」都在 `packages/<目录>`。12 个包的 `package.json` 都没有 `dependencies`、没有 lock、没有 `preinstall`/`install`/`postinstall`。OSV 对下表版本返回 0 条（**已核实**，2026-11-12）。令牌由 magpie 的插件宿主写在 `plugin-auth.json`（明文 `0600`，见第 3.1 节）；下表只写插件自己再读的位置和发出的主机。
+
+| 包（mover 最低版本 → 审读版本） | 凭据从哪来 | 请求发往 | 动态执行 |
+| --- | --- | --- | --- |
+| `@magpie-community/opencode-antigravity-auth`（≥0.1.0 → 0.1.8，`antigravity`） | Google OAuth，PKCE，回环回调。刷新令牌存在登录记录里 | `accounts.google.com`、`oauth2.googleapis.com`、`cloudcode-pa.googleapis.com`、`daily-cloudcode-pa.googleapis.com`、`www.googleapis.com`，以及 Antigravity 更新清单（只读 `version:`） | 无安装期脚本 |
+| `@magpie-community/opencode-factory-auth`（≥0.1.41 → 0.1.46，`factory`） | WorkOS 设备流，与 `droid` 相同 | `api.factory.ai`、`api.eu.factory.ai`、`api.workos.com` | 无 |
+| `@magpie-community/opencode-kiro-auth`（≥0.1.36 → 0.1.37，`kiro`） | 浏览器登录，或读取 `kiro-cli`/IDE 已有令牌并写回；也接受 `ksk_` API Key | `app.kiro.dev`、`prod.us-east-1.auth.desktop.kiro.dev`、`runtime.us-east-1.kiro.dev`、`view.awsapps.com`（区域主机由登录结果决定） | `execFile` 调用本机 `kiro-cli debug refresh-auth-token` |
+| `@magpie-community/opencode-mimo-auth`（≥0.1.9 → 0.1.10，`mimo`） | 小米账号长轮询，会话 cookie；无会员时改用 Token Plan 的 `tp-` Key | `account.xiaomi.com`、`platform.xiaomimimo.com`、`mimo-server-{sgp,in,ru}.xiaomimimo.com` | 无 |
+| `@magpie-community/opencode-qoder-auth`（≥0.2.67 → 0.2.67，`qoder`） | PKCE 设备流。刷新令牌用过即废，新对立刻写回。企业域由用户给出的实例名拼主机 | `qoder.com` / `qoder.cn`、`openapi.qoder.sh`、`openapi.qoder.com.cn`、`api3.qoder.sh`、`gateway.qoder.com.cn`、`gateway.qwenwork.cn`，以及 `<实例>.vpc…` / `<corp>.rdc.aliyuncs.com` | `execFile` 本机已安装的 Qoder `runtime-info`，插件不自己下载它 |
+| `@magpie-community/opencode-devin-auth`（≥0.1.36 → 0.1.39，`devin`） | PKCE，回调 `127.0.0.1` | `app.devin.ai`、`api.devin.ai`、`server.codeium.com` | 可启动本机 `devin` CLI |
+| `@magpie-community/opencode-grok-auth`（≥0.2.7 → 0.2.7，`grok`） | 只读 `GROK_HOME` 或 `~/.grok/auth.json`。快过期时跑 CLI 刷新，插件自己不换票 | `auth.x.ai`、`api.x.ai`、`cli-chat-proxy.grok.com`、`x.ai` | `spawn`/`execFile` 本机 `grok` |
+| `@magpie-community/opencode-commandcode-auth`（≥0.1.22 → 0.1.24，`commandcode`） | 回环回调拿到的 API Key、只读 `~/.commandcode/auth.json`，或用户粘贴 | `commandcode.ai`、`api.commandcode.ai`、`staging.commandcode.ai` | 无 |
+| `@magpie-community/opencode-cursor-auth`（≥0.2.44 → 0.2.45，`cursor`） | 浏览器深链登录；或只读 macOS 钥匙串项 `cursor-access-token` / `cursor-user`，否则读 CLI 的 `auth.json`（注释写明不写回）；或用 API Key 换票 | `cursor.com`、`api2.cursor.sh`、`agentn.global.api5.cursor.sh` | `security find-generic-password` 读钥匙串 |
+| `@magpie-community/opencode-workbuddy-auth`（≥0.2.29 → 0.2.31，`workbuddy`） | 浏览器轮询，或读取 WorkBuddy 桌面端自己的登录 | `copilot.tencent.com`、`www.workbuddy.ai`、`www.workbuddy.cn`。User-Agent 必须像 WorkBuddy 客户端，否则对方拒绝 | 无隐藏上报；源码里的 “phone” 是手机号登录字段 |
+| `@magpie-community/opencode-zcode-auth`（≥0.1.61 → 0.1.61，`zcode`） | Z.ai / 智谱设备流。`access` 是计划 Key，其余 JSON 放在刷新字段 | `zcode.z.ai`、`api.z.ai`、`open.bigmodel.cn`、`bigmodel.cn`、`docs.z.ai` | 无 |
+| `@magpie-community/opencode-zed-auth`（≥0.1.18 → 0.1.19，`zed`） | 本机生成 RSA，回环收回加密的 `access_token`。短时模型令牌向 `cloud.zed.dev` 换 | `zed.dev`、`cloud.zed.dev` | 无 |
+
+这 12 个包没有 `eval(` / `new Function`。没有把提示词发到供应商以外的主机的字面 URL。对话正文会进入上表那些供应商 API，这是把订阅当客户端用，不是 magpie 自己的遥测。
+
+同一 commit 上对其余 `packages/`（101 个目录）做了模式扫描，没有逐行读：
+
+- 101 个 `package.json` 都没有 `preinstall`/`install`/`postinstall`。**已核实**。
+- 非测试代码里没有 PostHog / Sentry 上报字面量。`output-strategy` 的注释写明不做遥测。`notify` 只在用户配置后向 `ntfy.sh`、`api.day.app`、`api.telegram.org`、`sctapi.ftqq.com` 发通知。
+- `eval` 命中主要在测试。`doubao-work` 的 `page.eval` 是 Chrome DevTools Protocol，用来操作豆包自己的页面，不是 `eval` 一段从网上下来的字符串。
+- 若干**可选**登录插件会读对应桌面应用的浏览器配置或钥匙串，以取出该产品的登录，而不是通用浏览历史。抽看 `packages/tabbit/src/cookie.mjs`：临时复制 Cookie 库（注释写明副本含各站 Cookie，读完删除），SQL 按 `host_key` 和 cookie 名过滤，且仅 macOS。同类 `browser.mjs` 还出现在 `sensenova`、`gcp-ai`、`inkstone`、`mclaw`、`astudio`、`agnes`。这些包不在自动安装列表里，除 Tabbit 这段外没有逐行审。
+- 可选页面插件 `@magpie-community/page-fingerprint`（`packages/fingerprint`，`package.json` 0.2.3）内置 `lmfpd` SDK。打开后用 GET 从 `https://lm.ikale.io/data/` 和 `https://cdn.jsdmirror.com/npm/lmfpd-data@latest/` 拉检测器数据。`@latest` 没有钉死版本。`refresh` 在缓存版本与清单里的 `sha256` 相同则跳过；下载分块后未见先比对 `sha256` 再解压。探测请求 POST 到用户选的模型地址，不发到 `lm.ikale.io`。这是可选功能，不是 mover。
+
+未逐行审、只核对了索引或 npm 元数据的条目：
+
+- 单仓内除上表 12 个以外的包（约 89 个），包括会拉起本机进程的可选 `agent-console`（自带 `package-lock.json`，依赖未逐个查 OSV）。
+- `registry.json` 里不在 `@magpie-community` 范围的 19 个包。npm `latest` 均无安装钩子（**已核实**元数据）。仓库链接如下，源码未读：`@openviking/magpie-plugin` 0.2.0（<https://github.com/volcengine/OpenViking>）、`@vshulcz/magpie-deja` 0.24.2（依赖 `@vshulcz/deja-vu`，<https://github.com/vshulcz/deja-vu>）、`@guotree/magpie-websearch` 0.7.3、`magpie-search-mix` 0.2.0、`magpie-comfyui-link` 0.2.0、`magpie-plugin-pink` 0.1.1（依赖 `jsonc-parser` 3.3.1）、`@hoptoper/magpie-agent-wispterm` / `citebox` / `wisp-science` 0.1.0（同一仓库 <https://github.com/xuzhougeng/magpie-agents>）、`magpie-agent-kaku` 0.1.1（依赖 `toml-eslint-parser` 1.0.3）、`magpie-aws-bedrock-sso` 0.4.0、`magpie-providers-hub` 0.12.3、`magpie-plugin-codar` 0.1.2、`magpie-deepaicode` 0.2.3、`opencode-teleagent-auth` 0.2.0、`opencode-xfyun-maas-auth` 0.1.1、`magpie-muse-auth` 0.1.11、`magpie-dafeiyu` 0.1.5。`magpie-review-rules` 1.1.3 的 npm 元数据没有 `repository` 字段，来源 **无法确认**。
+
+## 9. 供应链：依赖是否恶意（补审）
+
+结论：自动安装的 12 个订阅插件没有 npm 运行时依赖，也没有安装钩子，OSV 未把这些版本标为漏洞或恶意包。官方索引里的其余包不能凭这次扫描宣称无恶意；单仓模式扫描没有看到安装期脚本或 PostHog 字面量，仓外 19 个包只核对了 registry 元数据。
+
+- 12 个 mover：`dependencies` 为空，无 lock 文件也可复现「没有第三方 npm 包」。状态：**已核实**（`16b487fa` 的 `package.json`）。OSV `querybatch` 对上表版本均为 none。状态：**已核实**。
+- 单仓 101 个包：无 `preinstall`/`install`/`postinstall`。状态：**已核实**（字符串扫描）。这不能代替逐包读依赖树；多数包同样没有 `dependencies`，有依赖的（如 `agent-console`）未做 OSV。状态：钩子 **已核实** 没有，依赖树 **无法确认**。
+- 仓外 19 个：npm `latest` 无安装钩子。`deja`、`pink`、`kaku` 各有一个直接依赖，名称是上游自己的包或常见解析器，不像仿冒名。未下载 tarball，未对依赖做 OSV。状态：钩子 **已核实**，包内容 **无法确认**。
+- `page-fingerprint` 运行时下载 `lmfpd-data@latest`，完整性只有清单字段，没有把分块哈希钉在源码里。这是可选插件的供应链缺口，不是 mover 的默认路径。状态：**已核实**（SDK 源码），未运行下载。
+- 本仓库 Go 模块结论不变：`go.mod`/`go.sum` 在这 11 个提交里没有改动。第 4 节的 OSV 命中仍然有效，可达性仍 **无法确认**。
+- 仍没有一份完整恶意包名录被整份对照。状态：**无法确认** 名录之外的投毒。
+
+## 10. 更新后的总体结论
+
+结论：开源完整度仍是**部分**，个人使用风险仍是**中**。补审没有找到会把先前定级升到「高」的后门，也没有把产品变成「全部开源」。
+
+- 开源：主体仍在本 MIT 仓库。官方签名发布仍依赖 `magpie-releases` 的密钥。订阅请求实现在公开的 `magpie-community/plugins`（`16b487fa`），但是运行时另行安装的代码，不在 `v0.1.3931` 二进制里。索引还收录没有随该 commit 审读的第三方包。
+- 风险：凭据存储、网关鉴权、安装脚本信任模型和每日计数都没有被这 11 个上游提交改掉。自动安装的插件把令牌发到各供应商 API，并可能读取该供应商自己的钥匙串或登录文件。可选插件里，指纹页会下载未钉版本的检测器数据，若干登录插件会读桌面应用的 Cookie 库。这些是使用订阅插件时就要接受的信任面，和第 1 节的「中」一致。
+- 若只使用 `v0.1.3931` 而不再跟上游 `main`，第 7 节的 Codex Desktop 身份开关还不在那次发布里。跟到 `797a23cade5aa013a85b52cadc317fcc7f0c1c11` 之后，默认行为仍是 Codex CLI 身份。
+
